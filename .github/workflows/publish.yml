@@ -15,7 +15,7 @@ on:
           - testpypi
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-and-publish:
