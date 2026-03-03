@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pawn-queue"
-version = "0.1.0"
+version = "0.1.1"
 description = "S3-compatible pub/sub queue library with no AWS account required"
 readme = "README.md"
 requires-python = ">=3.11"
