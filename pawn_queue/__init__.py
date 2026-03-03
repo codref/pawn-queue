@@ -30,7 +30,7 @@ Quickstart::
 
 from .config import PawnQueueConfig
 from .consumer import Consumer
-from .core import PawnQueue
+from .core import PawnQueue, PawnQueueBuilder
 from .exceptions import (
     CompatibilityError,
     ConfigError,
@@ -47,6 +47,7 @@ from .producer import Producer
 
 __all__ = [
     "PawnQueue",
+    "PawnQueueBuilder",
     "PawnQueueConfig",
     "Producer",
     "Consumer",
@@ -64,3 +65,4 @@ __all__ = [
 ]
 
 __version__ = "0.1.0"
+

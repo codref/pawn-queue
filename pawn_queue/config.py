@@ -5,11 +5,30 @@ Pydantic v2 settings model.  Loads from a YAML file, then overlays
 environment variables.
 
 Environment variable mapping:
-  PAWNQUEUE_S3_ENDPOINT_URL   → s3.endpoint_url
-  PAWNQUEUE_S3_BUCKET_NAME    → s3.bucket_name
-  PAWNQUEUE_S3_ACCESS_KEY     → s3.aws_access_key_id
-  PAWNQUEUE_S3_SECRET_KEY     → s3.aws_secret_access_key
-  PAWNQUEUE_S3_REGION         → s3.region_name
+  S3 Settings:
+    PAWNQUEUE_S3_ENDPOINT_URL           → s3.endpoint_url
+    PAWNQUEUE_S3_BUCKET_NAME            → s3.bucket_name
+    PAWNQUEUE_S3_ACCESS_KEY             → s3.aws_access_key_id
+    PAWNQUEUE_S3_SECRET_KEY             → s3.aws_secret_access_key
+    PAWNQUEUE_S3_REGION                 → s3.region_name
+    PAWNQUEUE_S3_USE_SSL                → s3.use_ssl (default: true)
+
+  Polling Settings:
+    PAWNQUEUE_POLLING_INTERVAL_SECONDS       → polling.interval_seconds
+    PAWNQUEUE_POLLING_MAX_MESSAGES_PER_POLL  → polling.max_messages_per_poll
+    PAWNQUEUE_POLLING_VISIBILITY_TIMEOUT     → polling.visibility_timeout_seconds
+    PAWNQUEUE_POLLING_LEASE_REFRESH_INTERVAL → polling.lease_refresh_interval_seconds
+    PAWNQUEUE_POLLING_JITTER_MAX_MS          → polling.jitter_max_ms
+
+  Concurrency Settings:
+    PAWNQUEUE_CONCURRENCY_STRATEGY           → concurrency.strategy
+    PAWNQUEUE_CSPRNG_JITTER_MIN_MS           → concurrency.csprng_verify.jitter_min_ms
+    PAWNQUEUE_CSPRNG_JITTER_MAX_MS           → concurrency.csprng_verify.jitter_max_ms
+    PAWNQUEUE_CSPRNG_VERIFY_RETRIES          → concurrency.csprng_verify.verify_retries
+    PAWNQUEUE_CSPRNG_RETRY_DELAY_MS          → concurrency.csprng_verify.verify_retry_delay_ms
+
+  Registry Settings:
+    PAWNQUEUE_REGISTRY_HEARTBEAT_INTERVAL    → registry.heartbeat_interval_seconds
 """
 
 from __future__ import annotations
@@ -70,19 +89,74 @@ class PawnQueueConfig(BaseModel):
     @classmethod
     def _apply_env_overrides(cls, values: dict) -> dict:
         """Overlay environment variables on top of YAML values."""
+        
+        # S3 configuration
         s3 = values.get("s3", {})
-        env_map = {
+        s3_env_map = {
             "PAWNQUEUE_S3_ENDPOINT_URL": "endpoint_url",
             "PAWNQUEUE_S3_BUCKET_NAME": "bucket_name",
             "PAWNQUEUE_S3_ACCESS_KEY": "aws_access_key_id",
             "PAWNQUEUE_S3_SECRET_KEY": "aws_secret_access_key",
             "PAWNQUEUE_S3_REGION": "region_name",
         }
-        for env_key, field in env_map.items():
+        for env_key, field in s3_env_map.items():
             val = os.environ.get(env_key)
             if val is not None:
                 s3[field] = val
+        
+        # S3 boolean flags
+        ssl_val = os.environ.get("PAWNQUEUE_S3_USE_SSL")
+        if ssl_val is not None:
+            s3["use_ssl"] = ssl_val.lower() in ("true", "1", "yes")
+        
         values["s3"] = s3
+        
+        # Polling configuration
+        polling = values.get("polling", {})
+        polling_env_map = {
+            "PAWNQUEUE_POLLING_INTERVAL_SECONDS": ("interval_seconds", float),
+            "PAWNQUEUE_POLLING_MAX_MESSAGES_PER_POLL": ("max_messages_per_poll", int),
+            "PAWNQUEUE_POLLING_VISIBILITY_TIMEOUT": ("visibility_timeout_seconds", float),
+            "PAWNQUEUE_POLLING_LEASE_REFRESH_INTERVAL": ("lease_refresh_interval_seconds", float),
+            "PAWNQUEUE_POLLING_JITTER_MAX_MS": ("jitter_max_ms", int),
+        }
+        for env_key, (field, typ) in polling_env_map.items():
+            val = os.environ.get(env_key)
+            if val is not None:
+                polling[field] = typ(val)
+        values["polling"] = polling
+        
+        # Concurrency configuration
+        concurrency = values.get("concurrency", {})
+        
+        # Main concurrency strategy
+        strategy_val = os.environ.get("PAWNQUEUE_CONCURRENCY_STRATEGY")
+        if strategy_val is not None:
+            concurrency["strategy"] = strategy_val
+        
+        # csprng_verify nested config
+        csprng = concurrency.get("csprng_verify", {})
+        csprng_env_map = {
+            "PAWNQUEUE_CSPRNG_JITTER_MIN_MS": ("jitter_min_ms", int),
+            "PAWNQUEUE_CSPRNG_JITTER_MAX_MS": ("jitter_max_ms", int),
+            "PAWNQUEUE_CSPRNG_VERIFY_RETRIES": ("verify_retries", int),
+            "PAWNQUEUE_CSPRNG_RETRY_DELAY_MS": ("verify_retry_delay_ms", int),
+        }
+        for env_key, (field, typ) in csprng_env_map.items():
+            val = os.environ.get(env_key)
+            if val is not None:
+                csprng[field] = typ(val)
+        concurrency["csprng_verify"] = csprng
+        
+        values["concurrency"] = concurrency
+        
+        # Registry configuration
+        registry = values.get("registry", {})
+        heartbeat_val = os.environ.get("PAWNQUEUE_REGISTRY_HEARTBEAT_INTERVAL")
+        if heartbeat_val is not None:
+            registry["heartbeat_interval_seconds"] = float(heartbeat_val)
+        values["registry"] = registry
+        
         return values
 
     @classmethod

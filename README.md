@@ -24,6 +24,11 @@ Works with [Hetzner Object Storage](https://www.hetzner.com/storage/object-stora
     - [Strategy: `csprng_verify` (default for Hetzner/Ceph)](#strategy-csprng_verify-default-for-hetznerceph)
     - [Automatic Strategy Detection](#automatic-strategy-detection)
   - [Configuration](#configuration)
+    - [Environment Variable Overrides](#environment-variable-overrides)
+    - [Alternative Configuration Methods](#alternative-configuration-methods)
+      - [1. Fluent Builder API (Programmatic)](#1-fluent-builder-api-programmatic)
+      - [2. Builder + Environment (Hybrid)](#2-builder--environment-hybrid)
+      - [3. Environment-Only (Docker / 12-Factor)](#3-environment-only-docker--12-factor)
   - [API Reference](#api-reference)
     - [`PawnQueue`](#pawnqueue)
     - [`Producer`](#producer)
@@ -33,6 +38,12 @@ Works with [Hetzner Object Storage](https://www.hetzner.com/storage/object-stora
   - [Running Tests](#running-tests)
     - [Unit Tests](#unit-tests)
     - [E2E Tests (Hetzner)](#e2e-tests-hetzner)
+  - [Publishing to PyPI](#publishing-to-pypi)
+    - [Setup](#setup)
+    - [Publish a Release](#publish-a-release)
+      - [Option 1: GitHub Releases (Automatic)](#option-1-github-releases-automatic)
+      - [Option 2: Manual Trigger (For Testing)](#option-2-manual-trigger-for-testing)
+    - [Verify Publication](#verify-publication)
   - [Idempotency Recommendation](#idempotency-recommendation)
   - [License](#license)
 
@@ -419,15 +430,101 @@ registry:
   heartbeat_interval_seconds: 60 # how often last_seen is updated in _registry/
 ```
 
-**All `s3.*` values can be overridden by environment variables:**
+### Environment Variable Overrides
 
-| Env var | Config key |
+**All settings can be overridden via environment variables** (S3, polling, concurrency, registry):
+
+| Setting | Env var |
 |---|---|
-| `PAWNQUEUE_S3_ENDPOINT_URL` | `s3.endpoint_url` |
-| `PAWNQUEUE_S3_BUCKET_NAME` | `s3.bucket_name` |
-| `PAWNQUEUE_S3_ACCESS_KEY` | `s3.aws_access_key_id` |
-| `PAWNQUEUE_S3_SECRET_KEY` | `s3.aws_secret_access_key` |
-| `PAWNQUEUE_S3_REGION` | `s3.region_name` |
+| **S3** ||
+| S3 endpoint | `PAWNQUEUE_S3_ENDPOINT_URL` |
+| Bucket name | `PAWNQUEUE_S3_BUCKET_NAME` |
+| Access key | `PAWNQUEUE_S3_ACCESS_KEY` |
+| Secret key | `PAWNQUEUE_S3_SECRET_KEY` |
+| Region | `PAWNQUEUE_S3_REGION` |
+| Use SSL | `PAWNQUEUE_S3_USE_SSL` |
+| **Polling** ||
+| Poll interval | `PAWNQUEUE_POLLING_INTERVAL_SECONDS` |
+| Max per poll | `PAWNQUEUE_POLLING_MAX_MESSAGES_PER_POLL` |
+| Visibility timeout | `PAWNQUEUE_POLLING_VISIBILITY_TIMEOUT` |
+| Lease refresh interval | `PAWNQUEUE_POLLING_LEASE_REFRESH_INTERVAL` |
+| Jitter max | `PAWNQUEUE_POLLING_JITTER_MAX_MS` |
+| **Concurrency** ||
+| Strategy | `PAWNQUEUE_CONCURRENCY_STRATEGY` |
+| csprng jitter min | `PAWNQUEUE_CSPRNG_JITTER_MIN_MS` |
+| csprng jitter max | `PAWNQUEUE_CSPRNG_JITTER_MAX_MS` |
+| csprng verify retries | `PAWNQUEUE_CSPRNG_VERIFY_RETRIES` |
+| csprng retry delay | `PAWNQUEUE_CSPRNG_RETRY_DELAY_MS` |
+| **Registry** ||
+| Heartbeat interval | `PAWNQUEUE_REGISTRY_HEARTBEAT_INTERVAL` |
+
+### Alternative Configuration Methods
+
+#### 1. Fluent Builder API (Programmatic)
+
+Use `PawnQueueBuilder` for dynamic configuration or testing:
+
+```python
+from pawn_queue import PawnQueueBuilder
+
+pawnqueue = await (
+    PawnQueueBuilder()
+    .s3(
+        endpoint_url="http://localhost:9000",
+        bucket_name="my-queue",
+        access_key="minioadmin",
+        secret_key="minioadmin",
+    )
+    .polling(interval_seconds=2, max_messages_per_poll=20)
+    .concurrency(strategy="conditional_write")
+    .build()
+)
+
+async with pawnqueue:
+    # use pawnqueue
+    ...
+```
+
+#### 2. Builder + Environment (Hybrid)
+
+Programmatically set some values, use env vars for others:
+
+```python
+from pawn_queue import PawnQueueBuilder
+
+pawnqueue = await (
+    PawnQueueBuilder()
+    .s3(
+        endpoint_url="http://localhost:9000",
+        bucket_name="my-queue",
+        access_key="minioadmin",
+        secret_key="minioadmin",
+    )
+    .from_env()  # fill remaining values from PAWNQUEUE_* env vars
+    .build()
+)
+```
+
+#### 3. Environment-Only (Docker / 12-Factor)
+
+Full configuration from environment variables:
+
+```python
+from pawn_queue import PawnQueueBuilder
+
+# All config comes from PAWNQUEUE_* env vars
+pawnqueue = await PawnQueueBuilder().from_env().build()
+```
+
+```bash
+# Docker environment
+export PAWNQUEUE_S3_ENDPOINT_URL=http://minio:9000
+export PAWNQUEUE_S3_BUCKET_NAME=queues
+export PAWNQUEUE_S3_ACCESS_KEY=minioadmin
+export PAWNQUEUE_S3_SECRET_KEY=minioadmin
+export PAWNQUEUE_POLLING_INTERVAL_SECONDS=1
+export PAWNQUEUE_CONCURRENCY_STRATEGY=csprng_verify
+```
 
 ---
 
@@ -553,6 +650,83 @@ pytest e2e/ -v --timeout=120
 
 ---
 
+## Publishing to PyPI
+
+### Setup
+
+1. **Create a PyPI account** at [pypi.org](https://pypi.org) if you don't have one.
+
+2. **Generate an API token:**
+   - Go to [pypi.org/manage/account/](https://pypi.org/manage/account/)
+   - Scroll to "API tokens" section
+   - Click "Create token"
+   - Scope: "Entire account" (or project-specific if you prefer)
+   - Copy the token (you won't see it again)
+
+3. **Add the token to your GitHub repository:**
+   - Go to your GitHub repo → Settings → Secrets and variables → Actions
+   - Click "New repository secret"
+   - Name: `PYPI_API_TOKEN`
+   - Secret: Paste your PyPI API token
+   - Click "Add secret"
+
+4. *(Optional)* **For TestPyPI (testing before production):**
+   - Create an account at [test.pypi.org](https://test.pypi.org)
+   - Generate an API token there
+   - Add it as `TEST_PYPI_API_TOKEN` GitHub secret
+
+### Publish a Release
+
+#### Option 1: GitHub Releases (Automatic)
+
+The easiest method — the workflow automatically triggers on release.
+
+1. **Update version in `pyproject.toml`:**
+   ```toml
+   [project]
+   name = "pawn-queue"
+   version = "0.2.0"  # Increment version
+   ```
+
+2. **Create a GitHub Release:**
+   - Go to your GitHub repo → Releases → "Create a new release"
+   - Tag version: `v0.2.0` (must match `pyproject.toml` version, prefixed with `v`)
+   - Release title: `Release 0.2.0`
+   - Description: Summarize changes
+   - Click "Publish release"
+
+The workflow will:
+- ✅ Verify version matches tag
+- ✅ Run unit tests
+- ✅ Build distributions (wheel + sdist)
+- ✅ Upload to PyPI
+- ✅ Attach releases as GitHub Release assets
+
+#### Option 2: Manual Trigger (For Testing)
+
+1. **Go to GitHub repo → Actions → "Publish to PyPI"**
+2. **Click "Run workflow"**
+3. **Choose PyPI environment:** `pypi` (production) or `testpypi` (testing)
+4. **Click "Run workflow"**
+
+Useful for testing the workflow with TestPyPI before pushing to production.
+
+### Verify Publication
+
+After a successful publish:
+
+```bash
+# Install the latest version from PyPI
+pip install --upgrade pawn-queue
+
+# Verify it works
+python -c "from pawn_queue import PawnQueue; print('Success!')"
+```
+
+Or check on [pypi.org/project/pawn-queue](https://pypi.org/project/pawn-queue).
+
+---
+
 ## Idempotency Recommendation
 
 The `csprng_verify` strategy provides strong exactly-once delivery guarantees through its 4-step cryptographic protocol (write → jitter → verify → post-verify confirmation). The post-verify confirmation step (Step 4) specifically closes the *late-write edge case* where a slow-network competitor PUT arrives at S3 after all verification rounds have passed.
@@ -579,4 +753,4 @@ For **atomic** exactly-once semantics with no probabilistic component, use AWS S
 
 ## License
 
-MIT
+Apache License 2.0 - see LICENSE file for details
