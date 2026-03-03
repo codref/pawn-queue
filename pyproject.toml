@@ -4,15 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pawn-queue"
-version = "0.1.2"
+version = "0.1.3"
 description = "S3-compatible pub/sub queue library with no AWS account required"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Davide Dal Farra" }]
 keywords = ["s3", "queue", "pubsub", "messaging", "hetzner", "minio"]
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",

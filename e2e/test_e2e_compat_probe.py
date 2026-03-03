@@ -14,7 +14,7 @@ import pytest
 from pawn_queue.exceptions import LeaseConflictError
 from pawn_queue.lease import LeaseContent, LeaseManager
 from pawn_queue.utils import generate_nonce, new_uuid, utcnow_iso
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 
 @pytest.mark.asyncio

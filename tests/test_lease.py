@@ -7,7 +7,7 @@ Unit tests for LeaseManager (csprng_verify strategy).
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -45,7 +45,7 @@ async def test_acquired_lease_persisted_in_s3(lease_manager, s3_client, topic_ma
 
 @pytest.mark.asyncio
 async def test_lease_expiry_detection():
-    past = (datetime.now(UTC) - timedelta(seconds=10)).isoformat()
+    past = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
     lc = LeaseContent(
         consumer_id="c",
         message_id="m",
@@ -58,7 +58,7 @@ async def test_lease_expiry_detection():
 
 @pytest.mark.asyncio
 async def test_lease_not_expired():
-    future = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()
+    future = (datetime.now(timezone.utc) + timedelta(seconds=60)).isoformat()
     lc = LeaseContent(
         consumer_id="c",
         message_id="m",
@@ -75,7 +75,7 @@ async def test_janitor_removes_expired_lease(lease_manager, s3_client, topic_man
 
     # Manually write an expired lease
     from pawn_queue.utils import canonical_json, lease_key
-    past = (datetime.now(UTC) - timedelta(seconds=5)).isoformat()
+    past = (datetime.now(timezone.utc) - timedelta(seconds=5)).isoformat()
     lc = LeaseContent(
         consumer_id=CONSUMER_ID,
         message_id=MSG_ID,
@@ -99,7 +99,7 @@ async def test_janitor_keeps_valid_lease(lease_manager, s3_client, topic_manager
     await topic_manager.create(TOPIC)
 
     from pawn_queue.utils import lease_key
-    future = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()
+    future = (datetime.now(timezone.utc) + timedelta(seconds=60)).isoformat()
     lc = LeaseContent(
         consumer_id=CONSUMER_ID,
         message_id=MSG_ID,

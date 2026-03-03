@@ -37,7 +37,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from .config import PawnQueueConfig

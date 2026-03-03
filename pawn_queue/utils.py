@@ -10,7 +10,7 @@ import hashlib
 import json
 import secrets
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 
 def new_uuid() -> str:
@@ -20,7 +20,7 @@ def new_uuid() -> str:
 
 def utcnow() -> datetime:
     """Return current UTC datetime (timezone-aware)."""
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def utcnow_iso() -> str:
