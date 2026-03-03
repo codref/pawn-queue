@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.env
+.venv/
+venv/
+env/
+
+# E2E secrets — NEVER commit
+e2e/config.yaml
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Ruff / Black
+.ruff_cache/
+
+# MyPy
+.mypy_cache/
+
+# IDE
+.idea/workspace.xml
+.idea/shelf/
+.idea/httpRequests/
+.idea/dataSources/
+.idea/queries/
+*.iml

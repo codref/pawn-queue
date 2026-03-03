@@ -1,0 +1,32 @@
+# pawnqueue-sqs configuration example
+# Copy this file to config.yaml and fill in your values.
+# All values can be overridden via environment variables (see README).
+
+s3:
+  endpoint_url: "http://localhost:9000"
+  bucket_name: "pawnqueue-sqs"
+  aws_access_key_id: "minioadmin"
+  aws_secret_access_key: "minioadmin"
+  region_name: "us-east-1"
+  use_ssl: false
+
+polling:
+  interval_seconds: 5
+  max_messages_per_poll: 10
+  visibility_timeout_seconds: 30
+  lease_refresh_interval_seconds: 10
+  jitter_max_ms: 200
+
+concurrency:
+  # auto     → probe for conditional_write at startup, fall back to csprng_verify
+  # conditional_write → use S3 If-None-Match: * (AWS S3, Cloudflare R2 only)
+  # csprng_verify     → cryptographic write-verify (works everywhere)
+  strategy: "auto"
+  csprng_verify:
+    jitter_min_ms: 100
+    jitter_max_ms: 400
+    verify_retries: 2
+    verify_retry_delay_ms: 150
+
+registry:
+  heartbeat_interval_seconds: 60
