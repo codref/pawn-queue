@@ -1,4 +1,4 @@
-# pawnqueue-sqs
+# pawn-queue
 
 A pure-Python async pub/sub queue library that turns **any S3-compatible object store** into a lightweight message queue — no AWS account required, no message broker to deploy.
 
@@ -8,26 +8,33 @@ Works with [Hetzner Object Storage](https://www.hetzner.com/storage/object-stora
 
 ## Contents
 
-- [Quick Start](#quick-start)
-- [How It Works](#how-it-works)
-- [Architecture](#architecture)
-  - [Bucket Layout](#bucket-layout)
-  - [High-Level Architecture](#high-level-architecture)
-  - [Full Publish → Consume Sequence](#full-publish--consume-sequence)
-  - [Lease Acquisition — Both Strategies](#lease-acquisition--both-strategies)
-  - [Crash Recovery via Janitor](#crash-recovery-via-janitor)
-  - [listen() Internal Task Structure](#listen-internal-task-structure)
-- [Concurrency & Safety](#concurrency--safety)
-  - [Strategy: conditional\_write](#strategy-conditional_write)
-  - [Strategy: csprng\_verify (default for Hetzner/Ceph)](#strategy-csprng_verify-default-for-hetznerceph)
-  - [Automatic Strategy Detection](#automatic-strategy-detection)
-- [Configuration](#configuration)
-- [API Reference](#api-reference)
-- [Installation](#installation)
-- [Running Tests](#running-tests)
-  - [Unit Tests](#unit-tests)
-  - [E2E Tests (Hetzner)](#e2e-tests-hetzner)
-- [Idempotency Recommendation](#idempotency-recommendation)
+- [pawn-queue](#pawn-queue)
+  - [Contents](#contents)
+  - [Quick Start](#quick-start)
+  - [How It Works](#how-it-works)
+  - [Architecture](#architecture)
+    - [Bucket Layout](#bucket-layout)
+    - [High-Level Architecture](#high-level-architecture)
+    - [Full Publish → Consume Sequence](#full-publish--consume-sequence)
+    - [Lease Acquisition — Both Strategies](#lease-acquisition--both-strategies)
+    - [Crash Recovery via Janitor](#crash-recovery-via-janitor)
+    - [listen() Internal Task Structure](#listen-internal-task-structure)
+  - [Concurrency \& Safety](#concurrency--safety)
+    - [Strategy: `conditional_write`](#strategy-conditional_write)
+    - [Strategy: `csprng_verify` (default for Hetzner/Ceph)](#strategy-csprng_verify-default-for-hetznerceph)
+    - [Automatic Strategy Detection](#automatic-strategy-detection)
+  - [Configuration](#configuration)
+  - [API Reference](#api-reference)
+    - [`PawnQueue`](#pawnqueue)
+    - [`Producer`](#producer)
+    - [`Consumer`](#consumer)
+    - [`Message`](#message)
+  - [Installation](#installation)
+  - [Running Tests](#running-tests)
+    - [Unit Tests](#unit-tests)
+    - [E2E Tests (Hetzner)](#e2e-tests-hetzner)
+  - [Idempotency Recommendation](#idempotency-recommendation)
+  - [License](#license)
 
 ---
 
