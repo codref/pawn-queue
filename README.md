@@ -124,7 +124,7 @@ graph TB
         C3[Consumer Z]
     end
 
-    subgraph PawnQueue["pawnqueue-sqs Library"]
+    subgraph PawnQueue["pawn-queue Library"]
         REG[Registry]
         PROD[Producer]
         CONS[Consumer]
@@ -237,40 +237,38 @@ sequenceDiagram
     participant C as Consumer
     participant S3 as S3 Bucket
 
-    alt Strategy: conditional_write (AWS S3 / Cloudflare R2)
-        C->>S3: PUT leases/{uuid}.lease<br/>[If-None-Match: *]
+    alt conditional_write (AWS S3 / Cloudflare R2)
+        C->>S3: PUT leases/{uuid}.lease [If-None-Match: *]
         alt Nobody else claimed first
-            S3-->>C: 201 Created → LEASE GRANTED
+            S3-->>C: 201 Created — LEASE GRANTED
         else Another consumer beat us
-            S3-->>C: 412 PreconditionFailed → BACK OFF
+            S3-->>C: 412 PreconditionFailed — BACK OFF
         end
 
-    else Strategy: csprng_verify (Hetzner / Ceph / MinIO / everyone else)
-        C->>C: nonce = secrets.token_bytes(32)<br/>lease_bytes = canonical_json(nonce, consumer_id, expires_at)<br/>expected_etag = MD5(lease_bytes)
-        Note over C,S3: Step 1 — write (last writer wins; winner unknown yet)
-        C->>S3: PUT leases/{uuid}.lease<br/>[body = lease_bytes, no condition header]
+    else csprng_verify (Hetzner / Ceph / MinIO)
+        Note over C,S3: Step 1: Write (last writer wins)
+        C->>S3: PUT leases/{uuid}.lease
         S3-->>C: 200 OK
-        Note over C,S3: Step 2 — jitter: let all concurrent PUT requests reach S3
-        C->>C: sleep(random jitter 100–400 ms)
-        Note over C,S3: Step 3 — verify (repeated verify_retries times)
+        
+        Note over C,S3: Step 2: Jitter (let all PUTs reach S3)
+        C->>C: sleep(random 100–400 ms)
+        
+        Note over C,S3: Step 3: Verify (check if our ETag survived)
         C->>S3: HEAD leases/{uuid}.lease
-        S3-->>C: ETag: "{stored_md5}"
+        S3-->>C: ETag: {stored_md5}
 
-        alt stored ETag == expected_etag  (our bytes survived all rounds)
-            C->>C: sleep(verify_retry_delay_ms)
-            C->>S3: HEAD leases/{uuid}.lease  (re-verify, verify_retries rounds)
-            S3-->>C: ETag: "{stored_md5}"  still ours
-            Note over C,S3: Step 4 — post-verify confirmation<br/>(guards against late-arriving competitor writes)
+        alt our ETag matches all rounds
+            Note over C,S3: Step 4: Post-verify (guard against late writes)
             C->>C: sleep(jitter_min_ms)
-            C->>S3: HEAD leases/{uuid}.lease  (final confirmation HEAD)
-            S3-->>C: ETag: "{stored_md5}"
-            alt final ETag still ours
+            C->>S3: HEAD leases/{uuid}.lease
+            S3-->>C: ETag: {stored_md5}
+            alt ETag still ours
                 C-->>C: LEASE GRANTED ✓
-            else final ETag changed (late write arrived after step 3)
-                C-->>C: BACK OFF — late competitor write detected
+            else ETag changed
+                C-->>C: BACK OFF — lost to late write
             end
-        else stored ETag ≠ expected_etag  (another consumer's bytes survived)
-            C-->>C: BACK OFF — another consumer won
+        else our ETag doesn't match
+            C-->>C: BACK OFF — competitor won
         end
     end
 ```
@@ -324,17 +322,18 @@ Lease TTL is controlled by `polling.visibility_timeout_seconds` (default: 30 s).
 graph LR
     subgraph asyncio_Event_Loop["asyncio Event Loop"]
         LISTEN["consumer.listen(handler)"]
-        POLL["_poll_loop()\ncall poll() on interval\nyield messages"]
-        REFRESH["_lease_refresher()\nre-PUT lease every N sec\nextends expires_at"]
-        HANDLER["handler(msg)\nuser callback"]
+        POLL["_poll_loop()<br/>polls at interval"]
+        REFRESH["_lease_refresher()<br/>refresh leases"]
+        HANDLER["handler(msg)<br/>user code"]
     end
 
-    LISTEN -->|asyncio.gather| POLL
-    LISTEN -->|asyncio.gather| REFRESH
-    POLL -->|for each claimed msg| HANDLER
-    HANDLER -->|msg.ack()\nor msg.nack()| S3[(S3 Bucket)]
-    REFRESH -->|PUT lease refresh| S3
-    LISTEN -->|"cancelled on\nKeyboardInterrupt\nor task.cancel()"| POLL & REFRESH
+    LISTEN -->|gather| POLL
+    LISTEN -->|gather| REFRESH
+    POLL -->|each message| HANDLER
+    HANDLER -->|ack or nack| S3[(S3 Bucket)]
+    REFRESH -->|renews| S3
+    LISTEN -->|cancel on exit| POLL
+    LISTEN -->|cancel on exit| REFRESH
 ```
 
 `listen()` runs until the task is cancelled (e.g., `Ctrl-C`). If the handler raises an exception, `nack()` is called automatically to move the message to dead-letter.
@@ -504,7 +503,7 @@ Calling `ack()` or `nack()` more than once is safe (subsequent calls are no-ops)
 ## Installation
 
 ```bash
-pip install pawnqueue-sqs
+pip install pawn-queue
 ```
 
 **Runtime dependencies:** `aioboto3 >= 13`, `pydantic >= 2`, `pyyaml >= 6`
